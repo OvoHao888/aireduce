@@ -9,10 +9,10 @@
 - **🎯 深度降重**：多阶段深度重构，适合高标准场景
 
 ### 🔒 安全性
-- 多层安全防护
-- 实时威胁检测
-- 自动安全响应
-- API密钥本地存储，不上传服务器
+- 口令 bcrypt 哈希存储
+- 提示词注入实时检测（12 类模式，命中即拒）
+- 接口级速率限制（处理接口 60 次/分，登录接口 10 次/分）
+- 安全事件写入日志，便于审计
 
 ### 🎨 精美UI
 - 毛细玻璃效果
@@ -27,6 +27,27 @@
 - VIP特权系统
 
 ## 🚀 快速开始
+
+### 前置准备
+
+**① 数据库**（必需）—— 创建库并导入表结构：
+
+```bash
+mysql -u root -p < backend/init.sql
+```
+
+脚本会创建 `aireduce_db` 与全部表，并写入演示数据。
+
+**② 配置文件** —— 复制 `backend/.env.example` 为 `backend/.env`，至少填写三项：
+
+| 变量 | 说明 |
+|---|---|
+| `DB_PASSWORD` | 本机 MySQL 的 root 口令 |
+| `SECRET_KEY` | 随机字符串，**至少 32 位**（`openssl rand -hex 32` 可生成） |
+| `API_KEY` | 大模型 API Key（也可启动后在管理后台的「API配置」页填写） |
+
+> 下面的启动脚本会自动检查这两步；未完成时会打印提示并退出，
+> 而不是启动一个连不上数据库的后端。
 
 ### 方式1：使用启动脚本（推荐）
 
@@ -170,23 +191,36 @@ aigc/
 
 ## 🔒 安全特性
 
+以下能力都在请求链路上真实生效（`backend/security.py` + `backend/deps.py`），
+不是只写在文档里的配置项。
+
+### 口令存储
+- 用户口令与管理员口令统一用 **bcrypt**（随机盐 + 成本因子）存储
+- 校验使用 bcrypt 的恒定时间比较；兼容历史无盐 SHA-256 哈希以平滑迁移
+
 ### 输入验证
-- 文本长度限制：10-50000字符
-- HTML标签清理
-- NULL字节过滤
-- 特殊字符转义
+- 文本长度 10 – 50000 字符
+- 拒绝全空白输入与 NULL 字节
+- HTML 清理：移除 `<script>`、内联事件处理器、`javascript:`、`<iframe>`
 
 ### 提示词注入防护
-自动检测恶意指令：
-- "ignore previous instructions"
-- "you are now a different AI"
-- `<script>alert('xss')</script>`
-- 等20+种恶意模式
+命中即拒绝（返回 400 并记录安全事件），覆盖 12 类模式：
+- 指令忽略 / 上下文忽略（`ignore previous instructions`、`forget everything`）
+- 角色扮演（`you are now …`、`pretend to be …`）
+- 提示词覆盖与泄露（`new instructions`、`reveal your system prompt`）
+- 脚本注入（`<script`、`javascript:`、`on\w+=`、`<iframe`）
 
 ### 速率限制
-- 每分钟60次请求限制
-- 客户端IP级别跟踪
-- 自动清理过期记录
+按客户端地址计数，超限返回 **429** 并带 `Retry-After`：
+
+| 接口 | 限制 |
+|---|---|
+| `POST /api/process`、`/api/process/stream` | 60 次 / 分钟 |
+| `POST /api/users/login`、`POST /api/admin/login` | 10 次 / 分钟（防撞库） |
+
+### 卡密兑换
+对卡密行加排他锁（`SELECT … FOR UPDATE`），
+保证并发场景下同一张卡只能成功兑换一次。
 
 ## 💡 常见问题
 
@@ -208,16 +242,3 @@ A: 在"密卡中心"页面的"密卡兑换"区域输入密卡码即可。
 ## 📄 许可证
 
 本项目仅供学习和研究使用。
-
-## 🙏 致谢
-
-- [Fuck-AIGC](https://github.com/): 提供快速降重提示词
-- [AI-Detection-Reduction-Tool](https://github.com/): 提供深度降重提示词
-
-## 反馈
-
-有问题欢迎提 [Issue](https://github.com/OvoHao888/aireduce/issues)。
-
----
-
-**🔧 AI降重系统 - 让文本更具原创性**

@@ -1,0 +1,11 @@
+# 统一换行符，避免跨平台 checkout 后脚本无法执行
+* text=auto
+
+*.sh   text eol=lf
+*.bat  text eol=crlf
+
+# 二进制资源不做换行符转换
+*.png   binary
+*.ico   binary
+*.faiss binary
+*.pkl   binary
