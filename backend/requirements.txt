@@ -1,0 +1,17 @@
+# 在 Python 3.14 上实测可安装（原版本锁定过旧，pydantic-core 无 cp314 wheel 会导致安装失败）
+
+fastapi==0.143.0      # Web 框架
+uvicorn==0.54.0       # ASGI 服务器
+# schemas.py 用到了 pydantic 的 EmailStr，必须有它才能启动（原 requirements.txt 漏了）
+email-validator==2.3.0
+python-multipart==0.0.32       # 表单/文件上传解析
+# pydantic-settings 是 config.py 读取 .env 的前提，原 requirements.txt 漏了它，
+# 导致按文档全新安装后 config.py 直接 ModuleNotFoundError。
+pydantic-settings==2.15.0
+pydantic==2.14.1       # 数据校验
+pymysql==1.2.3        # MySQL 驱动
+python-jose==3.5.0        # JWT 签发与校验
+bcrypt==5.0.0        # 密码哈希（随机盐）
+python-dotenv==1.2.4        # 读取 .env
+sqlalchemy==2.1.4        # ORM
+cryptography==50.0.2       # python-jose 的加密后端

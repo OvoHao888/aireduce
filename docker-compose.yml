@@ -1,0 +1,49 @@
+﻿services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+      - DB_NAME=aireduce_db
+      - SECRET_KEY=${SECRET_KEY:?请在 .env 中设置 SECRET_KEY}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - BASE_URL=${BASE_URL:-https://api.deepseek.com/v1}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-deepseek-chat}
+      - API_KEY=${API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./AIReduce
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+      - MYSQL_DATABASE=aireduce_db
+      - MYSQL_CHARSET=utf8mb4
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
