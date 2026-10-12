@@ -71,8 +71,22 @@
           <div class="demo-card">
             <div class="demo-header">
               <div class="demo-tabs">
-                <span class="tab active">快速降重</span>
-                <span class="tab">深度降重</span>
+                <span
+                  class="tab"
+                  :class="{ active: demoTab === 'mode1' }"
+                  role="button"
+                  tabindex="0"
+                  @click="demoTab = 'mode1'"
+                  @keydown.enter="demoTab = 'mode1'"
+                >快速降重</span>
+                <span
+                  class="tab"
+                  :class="{ active: demoTab === 'mode2' }"
+                  role="button"
+                  tabindex="0"
+                  @click="demoTab = 'mode2'"
+                  @keydown.enter="demoTab = 'mode2'"
+                >深度降重</span>
               </div>
               <span class="demo-badge">实时预览</span>
             </div>
@@ -81,12 +95,12 @@
             </div>
             <div class="demo-output">
               <div class="output-label">✨ 降重结果</div>
-              <p class="output-text">伴随AI技术的迅猛演进，深度学习于NLP领域实现了重大突破。近些年来，依托Transformer框架的大规模预训练语言模型呈现出卓越的文本生成与理解性能。</p>
+              <p class="output-text">{{ demoPreview[demoTab].output }}</p>
             </div>
             <div class="demo-actions">
               <div class="demo-stats-row">
-                <span class="demo-stat">重复率 <strong>32% → 8%</strong></span>
-                <span class="demo-stat">AI率 <strong>45% → 5%</strong></span>
+                <span class="demo-stat">重复率 <strong>{{ demoPreview[demoTab].duplicate }}</strong></span>
+                <span class="demo-stat">AI率 <strong>{{ demoPreview[demoTab].aiRate }}</strong></span>
                 <span class="demo-stat success">✅ 顺利通过</span>
               </div>
             </div>
@@ -266,6 +280,21 @@ const faqRef = ref(null)
 
 // FAQ active state
 const activeFaq = ref(0)
+
+// 首屏演示卡片：快速 / 深度 两种模式的效果对照
+const demoTab = ref('mode1')
+const demoPreview = {
+  mode1: {
+    output: '伴随AI技术的迅猛演进，深度学习于NLP领域实现了重大突破。近些年来，依托Transformer框架的大规模预训练语言模型呈现出卓越的文本生成与理解性能。',
+    duplicate: '32% → 8%',
+    aiRate: '45% → 5%'
+  },
+  mode2: {
+    output: '近年来，人工智能技术的迭代速度显著加快，其中深度学习在自然语言处理方向上的推进尤为突出。以Transformer为核心架构的大规模预训练模型，凭借其在文本生成与语义理解两方面的出色表现，已成为支撑该领域发展的关键技术。',
+    duplicate: '32% → 5%',
+    aiRate: '45% → 2%'
+  }
+}
 
 // Features data - 4个卡片，对照数据说话样式
 const features = [
@@ -635,6 +664,12 @@ onUnmounted(() => {
 .tab.active {
   background: linear-gradient(135deg, #e67e22, #f39c12);
   color: white;
+  cursor: default;
+}
+
+.tab:not(.active):hover {
+  background: rgba(230, 126, 34, 0.2);
+  color: var(--primary-color);
 }
 
 .demo-badge {
