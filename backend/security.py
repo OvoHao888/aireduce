@@ -2,12 +2,15 @@
 安全验证和防护模块
 包含所有安全相关的验证和防护功能
 """
+import logging
 import re
 import time
 from typing import Dict, Tuple
 from collections import defaultdict
 from datetime import datetime, timedelta
 import hashlib
+
+logger = logging.getLogger(__name__)
 
 class SecurityValidator:
     """
@@ -277,12 +280,11 @@ class SecurityValidator:
             details: 详细信息
         """
         timestamp = datetime.now().isoformat()
-        log_entry = (
-            f"[{timestamp}] {event_type} | "
-            f"Client: {client_id} | "
-            f"Details: {details}"
+        # 用 logger 而非 print：安全事件需要被日志系统收集与检索
+        logger.warning(
+            "SECURITY | %s | Client: %s | Details: %s",
+            event_type, client_id, details,
         )
-        print(f"SECURITY: {log_entry}")
 
 # 全局安全验证器实例
 security_validator = SecurityValidator()

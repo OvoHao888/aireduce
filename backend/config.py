@@ -23,6 +23,8 @@ class SecuritySettings(BaseSettings):
     # 速率限制
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_PER_HOUR: int = 1000
+    # 登录接口单独收紧：60 次/分钟对撞库来说太宽松
+    LOGIN_RATE_LIMIT_PER_MINUTE: int = 10
     
     # 文本长度限制
     MAX_TEXT_LENGTH: int = 50000  # 50KB

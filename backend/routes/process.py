@@ -15,14 +15,19 @@ from database import get_db, SessionLocal
 from models import User, UsageRecord
 from auth import get_current_user, is_valid_member
 from schemas import ProcessRequest, UsageRecordResponse, UsageRecordListResponse
-from config import ai_settings
+from config import ai_settings, security_settings
+from deps import rate_limit
+from security import security_validator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/process", tags=["文本处理"])
 
 
-@router.post("")
+@router.post(
+    "",
+    dependencies=[Depends(rate_limit("process", security_settings.RATE_LIMIT_PER_MINUTE))],
+)
 async def process_text(
     request: ProcessRequest,
     current_user: User = Depends(get_current_user),
@@ -36,12 +41,29 @@ async def process_text(
             logger.warning(f"会员已过期: {current_user.email}")
             raise HTTPException(status_code=403, detail="会员已过期，请兑换卡密")
         
-        if not request.text or len(request.text.strip()) < 10:
-            raise HTTPException(status_code=400, detail="请输入至少10个字符的文本")
-        
-        if len(request.text.strip()) > 50000:
-            raise HTTPException(status_code=400, detail="文本长度不能超过50000字符")
-        
+        # 输入校验：长度 / 全空白 / NULL 字节（由 security.py 统一实现）
+        ok, msg = security_validator.validate_text_input(
+            request.text,
+            min_length=security_settings.MIN_TEXT_LENGTH,
+            max_length=security_settings.MAX_TEXT_LENGTH,
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
+
+        # 检测在清理之前：命中注入模式直接拒绝（fail closed），
+        # 而不是悄悄清洗后继续处理 —— 对调用方来说，你的输入被拒绝
+        # 比你的输入被静默改了更容易排查。
+        # sanitize_html 作为第二道防线，兜住检测规则没枚举到的变体。
+        ok, msg = security_validator.check_prompt_injection(request.text)
+        if not ok:
+            security_validator.log_security_event(
+                "PROMPT_INJECTION", current_user.email, msg
+            )
+            raise HTTPException(status_code=400, detail=msg)
+
+        # HTML 清理：移除 script / 事件处理器 / javascript: / iframe
+        safe_text = security_validator.sanitize_html(request.text)
+
         if request.mode not in ["mode1", "mode2"]:
             raise HTTPException(status_code=400, detail="无效的处理模式")
         
@@ -57,7 +79,7 @@ async def process_text(
         record = UsageRecord(
             user_id=current_user.id,
             mode=request.mode,
-            input_text=request.text[:50000],
+            input_text=safe_text[:50000],
             status="processing"
         )
         
@@ -76,7 +98,7 @@ async def process_text(
             async def collect_result():
                 full_result = ""
                 async for result in processor.process_text(
-                    text=request.text,
+                    text=safe_text,
                     mode=request.mode,
                     api_key=api_key,
                     base_url=base_url,
@@ -131,7 +153,10 @@ async def process_text(
         raise HTTPException(status_code=500, detail="处理失败，请稍后重试")
 
 
-@router.post("/stream")
+@router.post(
+    "/stream",
+    dependencies=[Depends(rate_limit("process", security_settings.RATE_LIMIT_PER_MINUTE))],
+)
 async def process_text_stream(
     request: ProcessRequest,
     current_user: User = Depends(get_current_user),
@@ -146,12 +171,29 @@ async def process_text_stream(
             logger.warning(f"会员已过期: {current_user.email}")
             raise HTTPException(status_code=403, detail="会员已过期，请兑换卡密")
         
-        if not request.text or len(request.text.strip()) < 10:
-            raise HTTPException(status_code=400, detail="请输入至少10个字符的文本")
-        
-        if len(request.text.strip()) > 50000:
-            raise HTTPException(status_code=400, detail="文本长度不能超过50000字符")
-        
+        # 输入校验：长度 / 全空白 / NULL 字节（由 security.py 统一实现）
+        ok, msg = security_validator.validate_text_input(
+            request.text,
+            min_length=security_settings.MIN_TEXT_LENGTH,
+            max_length=security_settings.MAX_TEXT_LENGTH,
+        )
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
+
+        # 检测在清理之前：命中注入模式直接拒绝（fail closed），
+        # 而不是悄悄清洗后继续处理 —— 对调用方来说，你的输入被拒绝
+        # 比你的输入被静默改了更容易排查。
+        # sanitize_html 作为第二道防线，兜住检测规则没枚举到的变体。
+        ok, msg = security_validator.check_prompt_injection(request.text)
+        if not ok:
+            security_validator.log_security_event(
+                "PROMPT_INJECTION", current_user.email, msg
+            )
+            raise HTTPException(status_code=400, detail=msg)
+
+        # HTML 清理：移除 script / 事件处理器 / javascript: / iframe
+        safe_text = security_validator.sanitize_html(request.text)
+
         if request.mode not in ["mode1", "mode2"]:
             raise HTTPException(status_code=400, detail="无效的处理模式")
         
@@ -167,7 +209,7 @@ async def process_text_stream(
         record = UsageRecord(
             user_id=current_user.id,
             mode=request.mode,
-            input_text=request.text[:50000],
+            input_text=safe_text[:50000],
             status="processing"
         )
         
@@ -195,7 +237,7 @@ async def process_text_stream(
             
             try:
                 async for result in processor.process_text(
-                    text=request.text,
+                    text=safe_text,
                     mode=request.mode,
                     api_key=api_key,
                     base_url=base_url,

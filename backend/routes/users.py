@@ -6,6 +6,8 @@ from database import get_db
 from models import User
 from schemas import UserRegister, UserLogin, UserResponse, TokenResponse
 from auth import verify_password, get_password_hash, create_access_token, get_current_user, get_member_level
+from config import security_settings
+from deps import rate_limit
 from datetime import datetime
 import logging
 
@@ -69,7 +71,11 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         logger.error(f"注册失败: {str(e)}")
         raise HTTPException(status_code=500, detail="注册失败，请稍后重试")
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(rate_limit("login", security_settings.LOGIN_RATE_LIMIT_PER_MINUTE))],
+)
 def login(user_data: UserLogin, db: Session = Depends(get_db)):
     try:
         if not user_data.email or not user_data.password:

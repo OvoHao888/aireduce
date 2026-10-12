@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db
 from auth import create_access_token, verify_password
+from config import security_settings
+from deps import rate_limit
 from jose import jwt, JWTError
 import logging
 import os
@@ -45,7 +47,11 @@ def verify_admin_token(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="无效的令牌", headers={"WWW-Authenticate": "Bearer"})
 
 # ==================== 管理员登录 ====================
-@router.post("/login", response_model=LoginResponse)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    dependencies=[Depends(rate_limit("admin_login", security_settings.LOGIN_RATE_LIMIT_PER_MINUTE))],
+)
 def admin_login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """管理员登录"""
     # 先按用户名取记录，再用 bcrypt 校验密码。
